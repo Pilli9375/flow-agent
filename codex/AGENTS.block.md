@@ -1,0 +1,26 @@
+<!-- flow-agent:begin (managed by flow-agent's installer; edit the source in the flow-agent repo, not here) -->
+## Videos with Google Flow (flow-agent) and images with Codex
+
+**Images: use Codex's built-in image generation (the ChatGPT image model). Never use Flow for images.** The `flow_*` tools are registered video-only; they refuse images, and `flow_edit` is off. For any still image, edit or variation, use the built-in image tool.
+
+**Videos: use the `flow_*` tools** (Google Flow via the local flow-agent worker). Videos spend the user's Flow credits, so:
+
+1. Call `flow_status`. If Chrome is unreachable or the user is signed out, tell them what it says and stop ("signed in, but no project open" is fine).
+2. Ask which Flow project to use (once per conversation): call `flow_project (action=list)`, show the list plus "New project", wait for the answer, then `flow_project (action=open)` (id, or `new`).
+3. Call `flow_account (what=credits)`. Pick the model by what the balance can afford: the best model whose whole batch costs at most about half the balance (Omni 1.2 Flash is newest and about 12 credits for 4 s at 720p; Omni 1.1 Flash is about 7 and leaves Flow on Dec 5; a 360p draft is about 4). Say the numbers.
+4. Ask the user for the settings as a short numbered list with your recommendation first: model, resolution (default 720p), duration (Omni 1.1 Flash: 4, 6, 8 or 10 s; Omni 1.2 Flash: any whole 3 to 15 s), aspect ratio (16:9 or 9:16). From Dec 5 Flow no longer lists Omni 1.1 Flash or Veo 3.1 Fast/Quality; if a job fails with "Flow does not offer the model ...", nothing was spent: tell the user which models Flow offers and ask again. Then call `flow_quote` for the chosen settings (it spends nothing), give the TOTAL credits for the whole batch, and wait for an explicit "go ahead". A yes covers only that exact plan; any regeneration, extra variant or changed setting is a new spend and needs a new yes.
+5. Only then call `flow_generate` with `type: "video"`, the approved settings, and `max_credits` set to the approved per-scene amount; then `flow_jobs (action=wait)` repeatedly until `finished: true`.
+6. Deliver: give the saved file path (videos are in `~/flow-agent-out/<project>/`), the `quality:` and `logo:` lines, and a preview sheet from `flow_files (action=preview)`. The worker downloads the best size up to 1080p (never below 720p) and removes Flow's corner logo automatically; originals are kept in `originals/`.
+
+Also available: `flow_files (action=stitch)` (join clips; `transition: "fade"` for separate shots, plain cut for chained scenes), `chain: true` on later scenes for continuous multi-scene films, `start_image`/`end_image`/`reference_images` for image-to-video (pass the absolute file path of an image Codex generated, e.g. under `~/.codex/generated_images/`, or one the user uploaded, e.g. under `~/.codex/attachments/`), `flow_library (action=list)` / `flow_library (action=trash)` / `flow_library (action=restore)` / `flow_library (action=rename/favorite/unfavorite/cover)` / `flow_project (action=rename)` for the project library.
+
+Veo models also stamp a small "Veo" text bottom-right; the worker removes it automatically (the `logo:` line says so, and a faint smudge can remain on textured frames: tell the user to look at the corner).
+
+`flow_files` also does free local post-production on finished clips (never touches Flow or the source; results go to an `exports/` folder): `action=export` (preset reels, tiktok, shorts, youtube, square or small; fit crop or pad), `trim`, `speed`, `mix_audio`, `captions` (from an .srt file you write), `preview`.
+
+Rules that never change:
+- If the user has set a daily credit budget (`flow_account (what=spend)` shows it), the worker enforces it. If a job fails with "Daily credit budget reached", tell the user and stop; only the user can raise it. A confirmation dialog may appear for video spends and Trash moves: if the user declines, nothing was done.
+- **Never spend credits without the user's explicit approval of the cost.** If a scene fails with "over the cap", nothing was spent: tell the user the quote and ask again.
+- **Trash is two steps.** `flow_library (action=trash)` first returns a preview and a confirm code; show the user that exact list, get their approval, then call again with the code. Nothing can be deleted permanently with these tools; if the user wants that, tell them to do it in Flow.
+- If `flow_status` shows a cooldown, or a job fails with Flow's "unusual activity" message, stop: tell the user plainly, say when the cooldown ends, and suggest generating the next one by hand in the Flow Chrome window. Never retry in a loop or try to get around the check.
+<!-- flow-agent:end -->

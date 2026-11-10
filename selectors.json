@@ -1,0 +1,40 @@
+{
+  "_comment": "Each action lists candidates in order; the first one that matches exactly one visible element wins. Placeholders: ${ratio}, ${count}. Fix a broken action by editing/adding a candidate here, no rebuild needed.",
+  "prompt_box": [
+    { "role": "textbox", "name": "What do you want to create?" },
+    { "css": "div.ProseMirror[contenteditable=true]" }
+  ],
+  "start": [
+    { "role": "button", "name": "Start generation" },
+    { "role": "button", "pattern": "^(Start|Generate|Create)" }
+  ],
+  "settings_trigger": [
+    { "role": "button", "pattern": "Settings trigger" }
+  ],
+  "mode_image": [{ "role": "radio", "name": "Image", "exact": true }],
+  "mode_video": [{ "role": "radio", "name": "Video", "exact": true }],
+  "mode_frames": [{ "role": "radio", "name": "Frames", "exact": true }],
+  "mode_ingredients": [{ "role": "radio", "name": "Ingredients", "exact": true }],
+  "clear_prompt": [{ "role": "button", "name": "Clear prompt", "exact": true }],
+  "frame_start": [{ "role": "button", "name": "Start", "exact": true }],
+  "frame_end": [{ "role": "button", "name": "End", "exact": true }],
+  "ingredient_add": [{ "role": "button", "name": "Add ingredients to the prompt box", "exact": true }],
+  "account_menu": [{ "role": "button", "name": "Account details" }],
+  "new_project": [{ "role": "button", "name": "New project", "exact": true }],
+  "picker_upload": [{ "role": "button", "name": "Upload media", "exact": true }],
+  "picker_list": [{ "role": "listbox", "name": "Asset list", "exact": true }],
+  "picker_add": [{ "role": "button", "name": "Add to prompt", "exact": true }],
+  "model_menu": [{ "role": "button", "name": "Select model family" }],
+  "model_item": [
+    { "role": "menuitem", "pattern": "^${model}( Leaving.*)?$" },
+    { "role": "menuitem", "name": "${model}", "exact": true }
+  ],
+  "resolution": [{ "role": "radio", "pattern": "^${resolution}" }],
+  "duration": [{ "role": "radio", "name": "${duration}s", "exact": true }],
+  "ratio":[{ "role": "radio", "name": "${ratio}", "exact": true }],
+  "count": [{ "role": "radio", "name": "x${count}", "exact": true }],
+  "credit_quote": [
+    { "role": "link", "pattern": "^\\d+ credits?$" },
+    { "css": ".credit-cost-link" }
+  ]
+}

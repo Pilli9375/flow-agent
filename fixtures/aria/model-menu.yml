@@ -1,0 +1,93 @@
+url: (removed)
+- link "Skip to main content":
+  - /url: "#main-content"
+- main:
+  - navigation:
+    - button "Home"
+    - heading "Flow Agent Sandbox" [level=1]
+    - textbox "Editable text":
+      - /placeholder: ""
+      - text: Flow Agent Sandbox
+  - button "More options for the project"
+  - button "Search"
+  - textbox "Search"
+  - button "Filtering and sorting options"
+  - button "Add media menu"
+  - button "Product help"
+  - button "Settings"
+  - button "More options"
+  - button "Account details":
+    - text: PRO
+    - 'button "Google Account: REDACTED, Google membership"'
+  - navigation "Project navigation":
+    - button "All media"
+    - button "Images"
+    - button "Characters"
+    - button "Scenes"
+    - button "Favorites"
+    - button "Uploads"
+    - separator
+    - link "Library Create collection":
+      - /url: /project/00000000-0000-0000-0000-000000000000
+      - text: Library
+      - button "Create collection"
+    - separator
+    - link "Tools":
+      - /url: /project/00000000-0000-0000-0000-000000000000/tools
+    - link "Create tool":
+      - /url: /project/00000000-0000-0000-0000-000000000000/create-tool
+    - link "Trash":
+      - /url: /project/00000000-0000-0000-0000-000000000000/trash
+    - button "Collapse"
+  - text: You're running low on Google Flow credits. Your credits will reset monthly, or top up to get more now.
+  - link "Add AI credits":
+    - /url: https://accounts.google.com/AccountChooser?continue=https%3A%2F%2Fone.google.com%2Fai%2Fcredits%3Futm_source%3Dflow%26utm_medium%3Dweb%26utm_campaign%3Dflow_low_credits_add_credits_banner&Email=REDACTED
+  - button "Dismiss credit banner"
+  - group "scene-04-1.jpeg":
+    - img "Tile displaying a user's image"
+  - group "scene-02-1.jpeg":
+    - img "Tile displaying a user's image"
+  - group "Library test A":
+    - img "Tile displaying a user's image"
+  - textbox "What do you want to create?":
+    - paragraph
+  - button "Add ingredients to the prompt box"
+  - button "Agent"
+  - button "Settings trigger": Video · 720p · 8s x1
+  - button "Start generation" [disabled]
+  - paragraph: Google Flow can make mistakes, so double check it
+- radiogroup:
+  - radio "Image"
+  - radio "Video" [checked]
+- radiogroup:
+  - radio "Frames"
+  - radio "Ingredients" [checked]
+- radiogroup:
+  - radio "16:9" [checked]
+  - radio "9:16"
+- separator
+- button "Select model family" [expanded]: Omni 1.1 Flash
+- radiogroup:
+  - radio "360p 360p generates faster at lower resolution":
+    - text: 360p
+    - img "360p generates faster at lower resolution": info
+  - radio "720p" [checked]
+- radiogroup:
+  - radio "4s"
+  - radio "6s"
+  - radio "8s" [checked]
+  - radio "10s"
+- radiogroup:
+  - radio "x1" [checked]
+  - radio "x2"
+  - radio "x3"
+  - radio "x4"
+- text: Generating will use
+- link "12 credits":
+  - /url: https://support.google.com/googleone?p=g1_ai_credit_menu
+- menu:
+  - menuitem "Omni 1.2 Flash"
+  - menuitem "Omni 1.1 Flash Leaving Dec 5"
+  - menuitem "Veo 3.1 - Lite"
+  - menuitem "Veo 3.1 - Fast Leaving Dec 5"
+  - menuitem "Veo 3.1 - Quality Leaving Dec 5"

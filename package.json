@@ -1,0 +1,31 @@
+{
+  "name": "flow-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Lean Google Flow automation: one core, an MCP server and a CLI.",
+  "bin": {
+    "flow-agent": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "login": "node dist/cli.js login",
+    "doctor": "node dist/cli.js doctor",
+    "test": "node scripts/test.mjs",
+    "setup": "node scripts/install.mjs",
+    "uninstall-agent": "node scripts/install.mjs --uninstall"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "playwright-core": "^1.49.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  },
+  "license": "MIT"
+}

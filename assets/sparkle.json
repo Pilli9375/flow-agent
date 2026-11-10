@@ -1,0 +1,21 @@
+{
+  "_comment": "Flow's visible sparkle is a white star at 30% opacity: shown = 0.7*original + 0.3*255*coverage. sparkle.png is its coverage mask (white = fully covered) in a 120x120 window; 'star' is the star width in px and 'centroid' its center inside the window, both at scale 1 (an image). The mask is an analytic star |x|^0.644+|y|^0.644<=27^0.644 (sharp tips, concave sides) fitted to the measured coverage.",
+  "alpha": 0.3,
+  "white": 255,
+  "window": 120,
+  "star": 48,
+  "centroid": [
+    60.478,
+    60.513
+  ],
+  "image": {
+    "marginRight": 96.5,
+    "marginBottom": 96.5
+  },
+  "video": {
+    "scale": 1.5,
+    "marginRight": 180.5,
+    "marginBottom": 180.5,
+    "refHeight": 1080
+  }
+}
