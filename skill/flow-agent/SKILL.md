@@ -1,6 +1,6 @@
 ---
 name: flow-agent
-description: Use whenever the user wants to generate images or videos with Google Flow / Nano Banana / Veo / Omni, make Flow stills, scenes or clips, or says "generate in Flow", or asks to redo/regenerate/fix a Flow image or video. Drives the local flow-agent MCP tools (flow_status, flow_account, flow_quote, flow_project, flow_generate, flow_jobs, flow_edit, flow_library, flow_files); it asks the user which Flow project to use and, for images, how many to make. Images cost 0 credits; videos SPEND credits, so ask the user to pick settings with clickable choices and approve the cost first.
+description: Use whenever the user wants to generate images or videos with Google Flow / Nano Banana / Veo / Omni, make Flow stills, scenes or clips, or says "generate in Flow", or asks to redo/regenerate/fix a Flow image or video. Drives the local flow-agent MCP tools (flow_status, flow_account, flow_quote, flow_project, flow_generate, flow_jobs, flow_edit, flow_library, flow_files, flow_upload); it asks the user which Flow project to use and, for images, how many to make. Images cost 0 credits; videos SPEND credits, so ask the user to pick settings with clickable choices and approve the cost first.
 ---
 
 # Flow generation via flow-agent
@@ -53,6 +53,9 @@ Wait for "Go ahead". A yes covers only that exact plan, not different settings, 
 ### Step 3: run
 The user may also see a confirmation dialog from the tool server (it lists the scenes and the credits); if they decline, nothing was spent: say so and ask what they want. If the user has set a daily credit budget (see `flow_account (what=spend)` and the `budget:` line in `flow_status`), the worker enforces it; if a job fails with "Daily credit budget reached", tell the user and stop. Only the user can raise it (`node dist/cli.js budget <credits>` in the flow-agent folder). Never look for a way around it.
 Call `flow_generate` with `type: "video"`, the chosen model/duration/resolution/aspect_ratio/variants, and `max_credits` set to the approved per-scene amount (round up a little to the estimate, never above what the user accepted). If a scene fails with "Skipped: Flow quotes N credits, over the cap", nothing was spent: tell the user N and ask again (step 2).
+
+## Bulk upload of local images (`flow_upload`)
+`flow_upload` puts many local images into the open Flow project's Uploads in one call: `files` (up to 50 absolute paths of png/jpg/jpeg/webp) and/or `folder` (every image directly inside it; `recursive: true` also looks one level into sub-folders). It is free (0 credits), generates nothing and needs no approval of a cost, but ask which project first like for everything else, because the images go into the open project. The whole request is checked before Flow is touched (missing file, wrong type, empty or over 25 MB, two different files with the same name, more than 50); nothing is replaced or deleted, and a file whose name already exists in the project is skipped and reported. It is refused while jobs run. To animate an uploaded image, pass its absolute path as `start_image`, `end_image` or `reference_images` in `flow_generate` (that still follows the video spend rules: settings, quote, cost approval).
 
 ## Managing the open project's media (list, trash, restore, rename, favorite, cover)
 Tools: `flow_library` with action list, trash_list, trash, restore, rename, favorite, unfavorite or cover; and `flow_project` with action=rename (all refused while jobs run).

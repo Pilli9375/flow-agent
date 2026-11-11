@@ -41,7 +41,7 @@ test("full mode lists the whole toolset", async () => {
   const s = await session({ FLOW_AGENT_VIDEO_ONLY: "" });
   const names = (await s.rpc("tools/list", {})).result.tools.map((t) => t.name);
   s.close();
-  for (const n of ["flow_generate", "flow_edit", "flow_quote", "flow_library", "flow_files", "flow_account", "flow_project", "flow_jobs", "flow_status"]) assert.ok(names.includes(n), n);
+  for (const n of ["flow_generate", "flow_edit", "flow_quote", "flow_library", "flow_files", "flow_account", "flow_project", "flow_jobs", "flow_status", "flow_upload"]) assert.ok(names.includes(n), n);
 });
 
 test("video-only mode: instructions say images stay with the client, and image requests are refused", async () => {
@@ -66,7 +66,7 @@ test("the toolset is merged into a small set of tools", async () => {
   const s = await session({ FLOW_AGENT_VIDEO_ONLY: "" });
   const names = (await s.rpc("tools/list", {})).result.tools.map((t) => t.name).sort();
   s.close();
-  assert.deepEqual(names, ["flow_account", "flow_edit", "flow_files", "flow_generate", "flow_jobs", "flow_library", "flow_project", "flow_quote", "flow_status"]);
+  assert.deepEqual(names, ["flow_account", "flow_edit", "flow_files", "flow_generate", "flow_jobs", "flow_library", "flow_project", "flow_quote", "flow_status", "flow_upload"]);
 });
 
 test("merged tools refuse a missing argument before doing anything", async () => {
@@ -79,4 +79,21 @@ test("merged tools refuse a missing argument before doing anything", async () =>
   assert.match(a.content[0].text, /trash needs items/);
   assert.match(b.content[0].text, /export needs preset/);
   assert.match(c.content[0].text, /open needs project/);
+});
+
+test("flow_upload is available in video-only mode (images made by the client can be uploaded; Flow never makes images there)", async () => {
+  const s = await session({ FLOW_AGENT_VIDEO_ONLY: "1" });
+  assert.match(s.init.result.instructions ?? "", /flow_upload/);
+  const names = (await s.rpc("tools/list", {})).result.tools.map((t) => t.name);
+  assert.ok(names.includes("flow_upload"));
+  s.close();
+});
+
+test("flow_upload refuses a bad request before touching Flow", async () => {
+  const s = await session({ FLOW_AGENT_VIDEO_ONLY: "1" });
+  // Checked in the tool server itself, so neither the worker nor Flow is reached.
+  const r = (await s.rpc("tools/call", { name: "flow_upload", arguments: { files: ["relative.png"] } })).result;
+  s.close();
+  assert.equal(r.isError, true);
+  assert.match(r.content[0].text, /Not an absolute path/);
 });

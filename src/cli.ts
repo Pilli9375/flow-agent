@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { call } from "./client.js";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { HOME_DIR, getFlowPage, launchChrome } from "./chrome.js";
 import { homedir } from "node:os";
 import { doctor, generate, generateImage } from "./flow.js";
@@ -97,6 +97,13 @@ async function viaWorkerRaw(): Promise<void> {
   } else if (cmd === "credits") {
     const r = await call<{ credits: number; resets?: string }>("/credits");
     console.log(`credits: ${r.credits}${r.resets ? `, resets ${r.resets}` : ""}`);
+  } else if (cmd === "upload") {
+    // flow-agent upload <file-or-folder>... [--recursive]   (free: puts local images into the open Flow project's Uploads)
+    const paths = rest.filter((a) => !a.startsWith("--")).map((p) => resolve(p));
+    const isDir = (p: string) => existsSync(p) && statSync(p).isDirectory();
+    const files = paths.filter((p) => !isDir(p)), folders = paths.filter(isDir);
+    if (folders.length > 1) throw new Error("Give at most one folder.");
+    console.log((await call<{ text: string }>("/upload", { files, folder: folders[0], recursive: rest.includes("--recursive") })).text);
   } else if (cmd === "projects") {
     console.log((await call<{ projects: string[] }>("/projects")).projects.join("\n"));
   } else if (cmd === "open-project") {
@@ -117,6 +124,7 @@ switch (cmd) {
   case "quote":
   case "credits":
   case "open-project":
+  case "upload":
     await viaWorker();
     break;
   case "daemon":

@@ -76,7 +76,7 @@ Be honest with yourself about quality: the star removal is exact maths; the Veo 
 
 ## Tools
 
-The assistant sees nine tools:
+The assistant sees ten tools:
 
 | Tool | What it does |
 |---|---|
@@ -87,6 +87,7 @@ The assistant sees nine tools:
 | `flow_generate` | Queue images or videos (returns job ids) |
 | `flow_jobs` | `wait` for the queued jobs, or `cancel` one |
 | `flow_edit` | Edit an existing image with a prompt (free). Video editing works but is off by default: set `FLOW_AGENT_VIDEO_EDIT=1` and `FLOW_AGENT_VIDEO_EDIT_COST=<credits you accept>`, because Flow's video editor shows no price |
+| `flow_upload` | Bulk-upload local images (up to 50, as file paths or a whole folder) into the open project's Uploads. Free. Checked in full before Flow is touched; a file whose name is already in the project is skipped, never replaced |
 | `flow_library` | `list` media, `trash_list`, `trash` (preview then confirm), `restore`, `rename`, `favorite`, `unfavorite`, `cover` |
 | `flow_files` | Work on local files, free: `preview` (a small contact sheet), `clean_logo`, `stitch` (join clips, cut or crossfade), `export` (reels, tiktok, shorts, youtube, square, small), `trim`, `speed`, `mix_audio`, `captions` (burn in an .srt) |
 
@@ -96,11 +97,12 @@ The assistant sees nine tools:
 - Omni 1.2 takes any whole 3 to 15 seconds, Omni 1.1 takes 4/6/8/10; Omni resolutions are 360p or 720p; ratios are 16:9 or 9:16; Veo is fixed at 8 seconds.
 - **Best size**: the worker downloads the highest size Flow offers, never below 720p and never above 1080p (it uses Flow's upscale).
 - **Image to video**: `start_image` / `end_image` (Flow's Frames) or up to 3 `reference_images` (Ingredients), as absolute file paths.
+- **Bulk upload** (`flow_upload`, or `node dist/cli.js upload <files or folder> [--recursive]`): puts a batch of images, for example the ones Codex generated under `~/.codex/generated_images/`, into the open project in one go, without a prompt and without credits. `png`, `jpg`, `jpeg` and `webp` only, at most 50 per call and 25 MB each. Two different files with the same name in one call are refused (Flow names an asset by its file name). Not available while jobs run.
 - **Longer films**: set `chain: true` on later scenes so each one starts from the previous scene's last frame, then `flow_files` with `stitch`.
 
 ### Command line (no assistant needed)
 
-`node dist/cli.js` mirrors it: `gen <project> scenes.json`, `wait`, `status`, `cancel`, `quote '<json>'`, `credits`, `spend`, `budget [n]`, `projects`, `open-project <id|new>`, `lib <op> '<json>'`, `edit '<json>'`, `stitch <project> [--fade]`, `preview <file>`, `clean-logo <file...>`, `export <file> <preset> [--pad] [--focus 0..1]`, `trim <file> <start> [end]`, `speed <file> <factor>`, `mix <file> <audio> [--volume 0.4] [--replace]`, `captions <file> <subs.srt>`, `cleanup`, `doctor [--fix|--offline|--capture]`.
+`node dist/cli.js` mirrors it: `upload <files|folder> [--recursive]`, `gen <project> scenes.json`, `wait`, `status`, `cancel`, `quote '<json>'`, `credits`, `spend`, `budget [n]`, `projects`, `open-project <id|new>`, `lib <op> '<json>'`, `edit '<json>'`, `stitch <project> [--fade]`, `preview <file>`, `clean-logo <file...>`, `export <file> <preset> [--pad] [--focus 0..1]`, `trim <file> <start> [end]`, `speed <file> <factor>`, `mix <file> <audio> [--volume 0.4] [--replace]`, `captions <file> <subs.srt>`, `cleanup`, `doctor [--fix|--offline|--capture]`.
 
 ## Pacing and Flow's "unusual activity" check
 

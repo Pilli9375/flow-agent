@@ -33,7 +33,7 @@ function guard(name: string | RegExp): void {
   if (FORBIDDEN.test(s)) throw new FlowUiError(`Refusing to click "${s}": the library only moves items to the Trash and restores them.`);
 }
 
-const log = (entry: Record<string, unknown>) => {
+export const log = (entry: Record<string, unknown>) => {
   try {
     mkdirSync(HOME_DIR, { recursive: true });
     appendFileSync(join(HOME_DIR, "actions.log"), JSON.stringify({ t: new Date().toISOString(), ...entry }) + "\n");

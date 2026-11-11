@@ -9,6 +9,7 @@ import { pause } from "./guard.js";
 import { budgetBlocked, recordSpend } from "./ledger.js";
 import { saveFixture } from "./offline.js";
 import { cleanVeoMark } from "./veomark.js";
+import { IMAGE_EXT } from "./uploadplan.js";
 
 type Common = { prompt: string; variants?: 1 | 2 | 3 | 4; max_credits?: number };
 export type ImageScene = Common & { type?: "image"; aspect_ratio?: "16:9" | "4:3" | "1:1" | "3:4" | "9:16" };
@@ -39,7 +40,7 @@ export const idOf = (url: string) => {
 const VIDEO_FORMAT = "mm,18,15";
 export const videoUrl = (url: string) => `${url.replace(/=.*$/, "")}=${VIDEO_FORMAT}`;
 
-async function ensureProject(page: Page): Promise<void> {
+export async function ensureProject(page: Page): Promise<void> {
   if (!/flow\.google\.com\/project\//.test(page.url())) {
     throw new FlowUiError("No Flow project is open. Open or create a project in the Flow Chrome window (run: flow-agent login).");
   }
@@ -56,7 +57,10 @@ async function choose(loc: Locator): Promise<void> {
   throw new FlowUiError("A settings option did not switch on after clicking it.");
 }
 
-const IMAGE_EXT = new Set([".png", ".jpg", ".jpeg", ".webp"]);
+
+// How an uploaded file is named in Flow's asset picker: the Ingredients picker appends the media type ("scene-01.jpeg
+// Image"), the Frames picker does not.
+export const optionNameRe = (fileName: string): RegExp => new RegExp(`^${fileName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}( Image)?$`);
 
 // Checked before anything is spent or clicked.
 function checkImages(scene: Scene): void {
@@ -164,8 +168,7 @@ async function attach(page: Page, trigger: Locator, file: string): Promise<void>
   await trigger.click();
   const list = await find(page, "picker_list");
   const name = basename(file);
-  // The Ingredients picker appends the media type ("scene-01.jpeg Image"), the Frames picker does not.
-  const exact = list.getByRole("option", { name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}( Image)?$`) });
+  const exact = list.getByRole("option", { name: optionNameRe(name) });
   const uploading = list.getByRole("option", { name: /^Uploading / });
   const [chooser] = await Promise.all([page.waitForEvent("filechooser", { timeout: 10_000 }), (await find(page, "picker_upload")).click()]);
   await chooser.setFiles(file);
@@ -195,7 +198,7 @@ export async function attachImages(page: Page, scene: Scene): Promise<void> {
 }
 
 // A menu or popup left open by an earlier step or run puts an invisible backdrop over the page that swallows clicks.
-async function dismissOverlays(page: Page): Promise<void> {
+export async function dismissOverlays(page: Page): Promise<void> {
   const open = page.locator(".cdk-overlay-backdrop-showing");
   for (let i = 0; i < 4 && (await open.count()) > 0; i++) {
     await page.keyboard.press("Escape");

@@ -7,6 +7,7 @@ import { Queue, type Job } from "./queue.js";
 import { listProjects, openProject } from "./projects.js";
 import { readCredits } from "./account.js";
 import { editItem } from "./edit.js";
+import { uploadMedia } from "./upload.js";
 import { editMedia, listMedia, listTrash, renameProject, restoreMedia, trashMedia } from "./library.js";
 
 export const PORT = Number(process.env.FLOW_AGENT_PORT ?? 8788);
@@ -48,6 +49,21 @@ const server = createServer(async (req, res) => {
       const beat = setInterval(() => res.write(" "), 15_000);
       try {
         res.end(JSON.stringify({ text: await editItem(a.item, a.prompt, a.max_credits ?? 0) }));
+      } catch (e) {
+        res.end(JSON.stringify({ error: (e as Error).message }));
+      } finally {
+        clearInterval(beat);
+      }
+      return;
+    }
+    if (url.pathname === "/upload" && req.method === "POST") {
+      if (queue.get().some((j) => j.status === "queued" || j.status === "running")) return send(409, { error: "Jobs are queued or running; upload after they finish." });
+      const a = await body(req);
+      // Many images can take minutes: same keep-alive as /edit (a blank every 15 s), result or {error} at the end.
+      res.writeHead(200, { "content-type": "application/json" });
+      const beat = setInterval(() => res.write(" "), 15_000);
+      try {
+        res.end(JSON.stringify({ text: await uploadMedia({ files: a.files, folder: a.folder, recursive: a.recursive }) }));
       } catch (e) {
         res.end(JSON.stringify({ error: (e as Error).message }));
       } finally {

@@ -11,14 +11,16 @@ import { cleanLogo } from "./logo.js";
 import { cleanVeoMark } from "./veomark.js";
 import { captions, exportPreset, mixAudio, speed, trim } from "./post.js";
 import { spendReport } from "./ledger.js";
+import { planUpload } from "./uploadplan.js";
 
 // Video-only mode (FLOW_AGENT_VIDEO_ONLY=1, set when registering the server in Codex): the client has its own image
 // generator, so nothing image-related is ever sent to Flow from it. Claude Code keeps the full toolset.
 const VIDEO_ONLY = process.env.FLOW_AGENT_VIDEO_ONLY === "1";
 const NO_IMAGES = "Flow is video-only in this client. Make still images with this client's own built-in image generation (the ChatGPT image model), never with Flow. Nothing was sent to Flow.";
+const UPLOAD_NOTE = " Images this client made can be uploaded to the Flow project with flow_upload (free) so Flow can animate them; Flow itself never generates images here.";
 const server = new McpServer(
   { name: "flow-agent", version: "0.1.0" },
-  VIDEO_ONLY ? { instructions: `${NO_IMAGES} Use the flow_* tools only for video (and for managing the video project: credits, quotes, stitching, previews, exports).` } : undefined,
+  VIDEO_ONLY ? { instructions: `${NO_IMAGES}${UPLOAD_NOTE} Use the flow_* tools only for video (and for managing the video project: credits, quotes, stitching, previews, exports, uploading source images).` } : undefined,
 );
 const text = (s: string) => ({ content: [{ type: "text" as const, text: s }] });
 // Confirmation the model cannot skip: before anything that spends credits or moves media to the Trash, the tool server
@@ -130,6 +132,20 @@ server.tool(
       const r = await call<{ finished: boolean; jobs: string[] }>(`/wait?t=35000${job_ids?.length ? `&ids=${job_ids.join(",")}` : ""}`);
       return `finished: ${r.finished}\n${r.jobs.join("\n")}`;
     }),
+);
+
+server.tool(
+  "flow_upload",
+  "Bulk-upload local images into the open Flow project's Uploads (free, 0 credits, nothing is generated). Give files (absolute paths of png/jpg/webp, up to 50) and/or a folder (all images directly inside it; recursive=true also looks one level into sub-folders, e.g. Codex's generated_images/<session>/). Use it to put images this client generated into Flow, then pass their absolute paths as start_image / end_image / reference_images in flow_generate to animate them. Checked in full before Flow is touched; a file whose name already exists in the project is skipped, never replaced; nothing is deleted. Refused while jobs run.",
+  {
+    files: z.array(z.string()).max(50).optional().describe("Absolute paths of png/jpg/jpeg/webp files"),
+    folder: z.string().optional().describe("Absolute folder: every png/jpg/webp directly inside it"),
+    recursive: z.boolean().optional().describe("With folder: also one level of sub-folders"),
+  },
+  (a) => guard(async () => {
+    planUpload(a); // refuse a bad request here, before the worker or Flow is involved
+    return (await call<{ text: string }>("/upload", a)).text;
+  }),
 );
 
 const ref = z.object({ n: z.number().int().min(1).describe("Number from the latest list"), title: z.string().describe("Its exact title, copied from the same list") });
