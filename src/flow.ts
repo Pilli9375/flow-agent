@@ -1,4 +1,4 @@
-import { appendFileSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { appendFileSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, extname, join } from "node:path";
 import type { Locator, Page } from "playwright-core";
@@ -78,14 +78,22 @@ function checkImages(scene: Scene): void {
 // Every media tile in grid order (newest first). A finished video carries a <video> (recent ones) or a
 // "Generated video thumbnail" image (older ones). Their links are signed and change between page loads, so tiles
 // are told apart by position and title, never by link.
-type Tile = { label: string; src: string; isVideo: boolean; failed: string };
+// A finished image shows a loaded picture that is not a video thumbnail (isImage).
+type Tile = { label: string; src: string; isVideo: boolean; isImage: boolean; failed: string };
 export async function tiles(page: Page): Promise<Tile[]> {
   return page.evaluate(() =>
     [...document.querySelectorAll("[role=group]")].map((g) => {
       const v = g.querySelector("video");
       const i = g.querySelector<HTMLImageElement>('img[alt="Generated video thumbnail"]');
+      const pic = !v && !i ? [...g.querySelectorAll<HTMLImageElement>("img")].find((im) => im.complete && im.naturalWidth >= 200) : undefined;
       const text = (g as HTMLElement).innerText.replace(/\s+/g, " ").trim();
-      return { label: g.getAttribute("aria-label") ?? "", src: v?.currentSrc || v?.src || (i && i.complete && i.naturalWidth > 0 ? i.src : "") || "", isVideo: !!v || !!i, failed: /^(warning )?Failed\b/i.test(text) ? text.slice(0, 300) : "" };
+      return {
+        label: g.getAttribute("aria-label") ?? "",
+        src: v?.currentSrc || v?.src || (i && i.complete && i.naturalWidth > 0 ? i.src : "") || pic?.currentSrc || "",
+        isVideo: !!v || !!i,
+        isImage: !!pic,
+        failed: /^(warning )?Failed\b/i.test(text) ? text.slice(0, 300) : "",
+      };
     }),
   );
 }
@@ -118,18 +126,18 @@ async function readSizes(page: Page, tile: Locator): Promise<SizeOption[]> {
 }
 
 // Clicks one entry of the open Download submenu and saves the file that arrives.
-async function saveSize(page: Page, text: string, file: string, timeoutMs: number): Promise<void> {
+async function saveSize(page: Page, text: string | RegExp, file: string, timeoutMs: number, ext = /\.mp4$/i): Promise<void> {
   // Own download folder, set right before the click: Chrome keeps one download setting for the whole browser and any
   // other client that connected since (even one that has exited) may have left it pointing at a deleted folder.
   const dlDir = mkdtempSync(join(tmpdir(), "flow-agent-dl-"));
   try {
     const cdp = await page.context().browser()!.newBrowserCDPSession();
     await cdp.send("Browser.setDownloadBehavior", { behavior: "allow", downloadPath: dlDir, eventsEnabled: true });
-    await page.getByRole("menuitem", { name: text, exact: true }).click();
+    await (typeof text === "string" ? page.getByRole("menuitem", { name: text, exact: true }) : page.getByRole("menuitem").filter({ hasText: text }).first()).click();
     let got: string | undefined;
     let lastSize = -1;
     for (const deadline = Date.now() + timeoutMs; Date.now() < deadline; await page.waitForTimeout(1500)) {
-      const done = readdirSync(dlDir).find((f) => f.endsWith(".mp4"));
+      const done = readdirSync(dlDir).find((f) => ext.test(f));
       if (!done) continue;
       const size = statSync(join(dlDir, done)).size;
       if (size > 0 && size === lastSize) {
@@ -138,11 +146,35 @@ async function saveSize(page: Page, text: string, file: string, timeoutMs: numbe
       }
       lastSize = size;
     }
-    if (!got) throw new FlowUiError(`The "${text}" file did not arrive in time.`);
+    if (!got) throw new FlowUiError(`The "${String(text)}" file did not arrive in time.`);
     copyFileSync(got, file);
   } finally {
     rmSync(dlDir, { recursive: true, force: true });
   }
+}
+
+// A finished image tile's full original from its Download menu ("1K Original size"; the upscaled sizes are skipped so
+// the logo cleaner sees Flow's original pixels). Returns the saved path, with .png when Flow sent a PNG.
+async function downloadImage(page: Page, tile: Locator, file: string): Promise<string> {
+  await tile.scrollIntoViewIfNeeded();
+  await tile.hover({ timeout: 10_000 });
+  const more = tile.getByRole("button", { name: "More options" });
+  if (await more.count()) await more.first().click();
+  else await tile.click({ button: "right" });
+  await page.getByRole("menuitem", { name: /Download/ }).first().hover();
+  await page.waitForTimeout(800);
+  try {
+    await saveSize(page, /Original size/, file, 120_000, /\.(jpe?g|png|webp)$/i);
+  } finally {
+    await page.keyboard.press("Escape").catch(() => {});
+  }
+  const head = readFileSync(file).subarray(0, 4);
+  if (head[0] === 0x89 && head[1] === 0x50) {
+    const png = file.replace(/\.\w+$/, ".png");
+    renameSync(file, png);
+    return png;
+  }
+  return file;
 }
 
 // With srcFile, the untouched original-size download is saved too (the logo is cleaned most exactly there).
@@ -344,6 +376,7 @@ export async function generate(scene: Scene, outDir: string, stem: string, onPro
       .filter((x): x is string => !!x),
   );
   const fresh = new Map<string, string>();
+  let imageTiles: number[] = [];
   mkdirSync(join(HOME_DIR, "diag"), { recursive: true });
   const mediaLog = join(HOME_DIR, "diag", "last-media.jsonl");
   writeFileSync(mediaLog, "");
@@ -370,7 +403,7 @@ export async function generate(scene: Scene, outDir: string, stem: string, onPro
 
     const want = scene.variants ?? 1;
     const deadline = Date.now() + (video ? 600_000 : 240_000);
-    while (fresh.size < want && Date.now() < deadline) {
+    while (fresh.size < want && imageTiles.length < want && Date.now() < deadline) {
       await page.waitForTimeout(1500);
       // New tiles are added above everything that was in the grid before Start (the old tiles keep their order).
       // A new tile counts once it holds a playable video; fresh is keyed by the tile's position from the top.
@@ -381,13 +414,21 @@ export async function generate(scene: Scene, outDir: string, stem: string, onPro
       // waiting longer or retrying would only repeat it, and the message is Flow's own.
       const rejected = isNew ? now.slice(0, added).find((t) => t.failed) : undefined;
       if (rejected) throw new FlowUiError(`Flow rejected the generation and nothing was delivered. Flow says: "${rejected.failed}"`);
-      if (!video) continue;
+      if (!video) {
+        // Flow now loads images as small previews from flow.google.com/asb, which the response check skips; a new
+        // tile with a loaded picture means the image is done, and its full original comes from the Download menu.
+        if (added >= want && isNew) {
+          const ready = now.slice(0, added).flatMap((t, index) => (!t.isVideo && t.isImage ? [index] : []));
+          if (ready.length >= want) imageTiles = ready.slice(0, want);
+        }
+        continue;
+      }
       if (added >= want && isNew) {
         const ready = now.slice(0, added).flatMap((t, index) => (t.isVideo && t.src ? [{ index, url: videoUrl(t.src) }] : []));
         if (ready.length >= want) for (const r of ready.slice(0, want)) fresh.set(String(r.index), r.url);
       }
     }
-    if (fresh.size < want) throw new FlowUiError(`Timed out: got ${fresh.size} of ${want} ${video ? "videos" : "images"}.`);
+    if (fresh.size < want && imageTiles.length < want) throw new FlowUiError(`Timed out: got ${Math.max(fresh.size, imageTiles.length)} of ${want} ${video ? "videos" : "images"}.`);
   } finally {
     page.off("response", onResponse);
   }
@@ -397,6 +438,18 @@ export async function generate(scene: Scene, outDir: string, stem: string, onPro
   let n = 0;
   let quality = "";
   const logo: string[] = [];
+  if (imageTiles.length && fresh.size < imageTiles.length) {
+    // Images found by their new tiles (see the wait loop): download each one's original from its menu.
+    await scrollGridToTop(page);
+    for (const index of imageTiles) {
+      const file = await downloadImage(page, page.locator("[role=group]").nth(index), join(outDir, `${stem}${imageTiles.length > 1 ? `-${++n}` : ""}.jpeg`));
+      onProgress?.("checking the file for a watermark (removed only if one is found; this can take a while on a slow PC)");
+      const clean = await cleanLogo(file, "image");
+      if (clean.status !== "none") logo.push(clean.note);
+      files.push(file);
+    }
+    return { credits, files, logo: logo.length ? [...new Set(logo)].join("; ") : "no watermark found, nothing to remove" };
+  }
   for (const [key, url] of fresh) {
     // Browser-context request: carries the signed-in cookies, no CORS (a page fetch is blocked cross-site).
     const res = await page.context().request.get(url);

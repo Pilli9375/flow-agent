@@ -398,16 +398,54 @@ async function cleanFile(file: string, kind: Kind, archive: boolean): Promise<Lo
   if (MODE === "keep") return { status: "skipped", note: "logo removal is off (FLOW_AGENT_LOGO=keep)" };
   try {
     const info = await probe(file);
-    const g = geometry(kind, info.w, info.h);
-    if (g.cx < 0 || g.cy < 0) return { status: "skipped", note: "frame too small for the logo" };
-    const c = buildCoverage(g, info.w, info.h);
     const times = kind === "image" ? [0] : [0.2, 0.5, 0.8].map((q) => q * info.duration);
-    const wins = await Promise.all(times.map((t) => grabWindow(file, t, c.win)));
-    const ms = wins.map((wd) => measure(wd, c));
-    const usable = ms.filter((m) => A.white - m.bg >= 30);
+    const found = (core: number, edge: number) => core > 0.5 && core < 1.6 && edge > 0.35 && edge < 1.8;
+    const detect = async (g: Geo) => {
+      const c = buildCoverage(g, info.w, info.h);
+      const wins = await Promise.all(times.map((t) => grabWindow(file, t, c.win)));
+      const usable = wins.map((wd) => measure(wd, c)).filter((m) => A.white - m.bg >= 30);
+      return { g, c, wins, usable, core: mean(usable.map((m) => m.core)), edge: mean(usable.map((m) => m.edge)) };
+    };
+    const g0 = geometry(kind, info.w, info.h);
+    if (g0.cx < 0 || g0.cy < 0) return { status: "skipped", note: "frame too small for the logo" };
+    let d = await detect(g0);
+    // Images downloaded from Flow's Download menu carry the star at another distance from the corner than the
+    // original-size files (about 100 to 120 px, not always the same across and down), so search that area. The corner
+    // is read once and every candidate position is measured in memory.
+    if (kind === "image" && !(d.usable.length && found(d.core, d.edge)) && info.w >= 320 && info.h >= 320) {
+      const even = (n: number) => n - (n % 2);
+      const big: Win = { x0: even(info.w - 300), y0: even(info.h - 300), w: 0, h: 0 };
+      big.w = info.w - big.x0; big.h = info.h - big.y0;
+      const corner = await grabWindow(file, 0, big);
+      const sub = (win: Win) => {
+        const out = new Uint8Array(win.w * win.h * 3);
+        for (let y = 0; y < win.h; y++) {
+          const from = ((win.y0 - big.y0 + y) * big.w + (win.x0 - big.x0)) * 3;
+          out.set(corner.subarray(from, from + win.w * 3), y * win.w * 3);
+        }
+        return out;
+      };
+      const tryAt = (mx: number, my: number) => {
+        const g = { ...g0, cx: info.w - mx - 0.5, cy: info.h - my - 0.5 };
+        const c = buildCoverage(g, info.w, info.h);
+        if (c.win.x0 < big.x0 || c.win.y0 < big.y0) return undefined;
+        const win = sub(c.win);
+        const m = measure(win, c);
+        if (A.white - m.bg < 30 || !found(m.core, m.edge)) return undefined;
+        return { g, c, wins: [win], usable: [m], core: m.core, edge: m.edge, miss: Math.abs(m.core - 1) + Math.abs(m.edge - 1) };
+      };
+      let best: ReturnType<typeof tryAt>;
+      const consider = (mx: number, my: number) => { const t = tryAt(mx, my); if (t && (!best || t.miss < best.miss)) best = t; };
+      for (let mx = 80; mx <= 140; mx += 2) for (let my = 80; my <= 140; my += 2) consider(mx, my);
+      if (best) {
+        const cx = info.w - best.g.cx - 0.5, cy = info.h - best.g.cy - 0.5;
+        for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) consider(cx + dx, cy + dy);
+      }
+      if (best) d = best;
+    }
+    const { g, c, wins, usable, core, edge } = d;
     if (!usable.length) return { status: "none", note: "corner too bright for a visible logo" };
-    const core = mean(usable.map((m) => m.core)), edge = mean(usable.map((m) => m.edge));
-    if (!(core > 0.5 && core < 1.6 && edge > 0.35 && edge < 1.8)) return { status: "none", note: `no logo found (core ${core.toFixed(2)}, edge ${edge.toFixed(2)})` };
+    if (!found(core, edge)) return { status: "none", note: `no logo found (core ${core.toFixed(2)}, edge ${edge.toFixed(2)})` };
     if (process.env.FLOW_AGENT_DEBUG) console.error(`logo detect: core ${core.toFixed(2)} edge ${edge.toFixed(2)}`);
     const tmp = join(dirname(file), `.clean-${process.pid}-${basename(file)}`);
     const fit = align(g, c, wins, info.w, info.h);
